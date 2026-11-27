@@ -50,6 +50,7 @@ dependencies = [
     # assets into the user-data dir. Runtime dep (not dev-only) since
     # the CLI ships in every install.
     "httpx>=0.28",
+    "mcp>=1.12,<2",
 ]
 
 [project.optional-dependencies]
