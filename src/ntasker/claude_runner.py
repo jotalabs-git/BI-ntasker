@@ -286,6 +286,16 @@ def queue_seed_for_task(task: dict) -> str:
             o = row_to_outcome(o)
             lines.append(f"- #{d['id']} {d['title']} -- {o['status']}: {o['summary']}")
             lines += [f"  - suggested follow-up: {n}" for n in o["next_tasks"]]
+    if os.environ.get("NTASKER_EXECUTION_BACKEND", "sandbox") == "sandbox":
+        lines += [
+            "", "## Sandbox execution rules", "",
+            "Work only in the assigned workspace. Do not install or invoke ntasker.",
+            "Do not contact the tracker API or other agents. Do not commit or push.",
+            "When finished, report the status (ok, failed, or blocked), a summary,",
+            "changed files and test results in your final chat response.",
+            "Then wait for human review. Do not attempt to update the task yourself.",
+        ]
+        return "\n".join(lines)
     from ntasker import plugins  # noqa: PLC0415 -- lazy: avoid cycle
 
     lines += plugins.run_briefings(int(task["id"]))
@@ -922,8 +932,8 @@ def _start_session(
     sandbox_mode = os.environ.get("NTASKER_EXECUTION_BACKEND", "sandbox") == "sandbox"
     cwd = default_cwd_for_project(row["project"] if row else None)
     if sandbox_mode:
-        if spec.key != "pi" or row is None or not row["project"] or row["worktree_id"]:
-            raise RuntimeError("Sandbox mode requires a Pi task with an explicit project and no worktree.")
+        if quick or resume or spec.key != "pi" or row is None or not row["project"] or row["worktree_id"]:
+            raise RuntimeError("Sandbox mode requires a fresh queued Pi task with an explicit project and no worktree.")
         approved = Path(os.environ["NTASKER_SANDBOX_WORKSPACE"]).resolve(strict=True)
         if Path(cwd).resolve(strict=True) != approved:
             raise RuntimeError("Task workspace does not match the approved sandbox workspace.")
