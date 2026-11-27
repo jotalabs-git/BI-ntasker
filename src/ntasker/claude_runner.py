@@ -25,6 +25,7 @@ import contextlib
 import os
 import re
 import shlex
+import shutil
 import signal
 import sys
 import tempfile
@@ -37,6 +38,7 @@ from pathlib import Path
 from fastapi import WebSocket, WebSocketDisconnect
 
 from ntasker import worktrees
+from ntasker.execution import plan_launch
 from ntasker.agents import AgentSpec, agent_available, get_spec, resolve_agent_key
 
 try:  # POSIX-only PTY machinery
@@ -80,7 +82,11 @@ def execution_policy_error() -> str | None:
     if backend == "local":
         return None
     if backend == "sandbox":
-        return "Sandbox execution is not yet available; local agent execution is blocked."
+        if not os.environ.get("NTASKER_SANDBOX_NAME") or not os.environ.get("NTASKER_SANDBOX_WORKSPACE"):
+            return "Configure an approved sandbox name and workspace before running agents."
+        if not shutil.which("sbx"):
+            return "Docker Sandbox CLI (sbx) is unavailable."
+        return None
     return f"Unsupported execution backend: {backend}"
 
 
@@ -96,6 +102,8 @@ def terminal_available(spec: AgentSpec) -> tuple[bool, str | None]:
     ok, reason = pty_available()
     if not ok:
         return ok, reason
+    if os.environ.get("NTASKER_EXECUTION_BACKEND", "sandbox") == "sandbox":
+        return (True, None) if spec.key == "pi" else (False, "Sandbox execution currently supports Pi only.")
     if not agent_available(spec):
         return False, (
             f"the `{spec.binary}` CLI was not found on PATH "
@@ -911,7 +919,14 @@ def _start_session(
         raise RuntimeError(policy_error)
 
     spec = get_spec(resolve_agent_key(row["agent"] if row else None))
+    sandbox_mode = os.environ.get("NTASKER_EXECUTION_BACKEND", "sandbox") == "sandbox"
     cwd = default_cwd_for_project(row["project"] if row else None)
+    if sandbox_mode:
+        if spec.key != "pi" or row is None or not row["project"] or row["worktree_id"]:
+            raise RuntimeError("Sandbox mode requires a Pi task with an explicit project and no worktree.")
+        approved = Path(os.environ["NTASKER_SANDBOX_WORKSPACE"]).resolve(strict=True)
+        if Path(cwd).resolve(strict=True) != approved:
+            raise RuntimeError("Task workspace does not match the approved sandbox workspace.")
     if row is not None and row["worktree_id"]:
         # The tree's checkout. A failure raises WorktreeError: running in the
         # shared project directory instead would break the isolation the queue
@@ -927,7 +942,6 @@ def _start_session(
     # directory-lock guard when dir_locks is on). Only agents with a settings
     # flag get the file; build_spawn ignores it otherwise.
     settings_path = hooks_settings_path(get_dir_locks()) if spec.settings_flag else None
-    master, slave = os.openpty()
     # Resume: reopen the stored session (conversation replays; a seed goes in as
     # its next prompt). Only when the agent supports it and an id was captured on
     # a previous run -- otherwise fall through to a fresh session.
@@ -965,6 +979,14 @@ def _start_session(
     # looks for a session id under the *current* directory only. Everything
     # else starts in the task's project directory.
     run_cwd = resume_cwd or resolve_run_cwd(cwd)
+    if sandbox_mode:
+        plan = plan_launch(
+            ("pi", *args[1:]), run_cwd, backend="sandbox",
+            workspace_root=projects_base_dir(),
+            sandbox_name=os.environ["NTASKER_SANDBOX_NAME"],
+        )
+        args = list(plan.argv)
+    master, slave = os.openpty()
     if not resume_id and spec.session_flag:
         _store_session_id(task_id, forced_id, run_cwd)
     proc = subprocess.Popen(
