@@ -109,6 +109,7 @@ class ProjectCreate(BaseModel):
     folder: str
     group: str
     git_init: bool = True
+    existing: bool = False
 
 
 @router.get("/api/projects/folders")
@@ -148,16 +149,21 @@ def api_create_project(payload: ProjectCreate) -> JSONResponse:
 
     target = base.joinpath(*folder, name)
     project = "/".join([*folder, name])
-    if target.exists():
+    if not target.resolve().is_relative_to(base.resolve()) or target.resolve() == base.resolve():
+        raise HTTPException(status_code=400, detail="Project must be inside the workspace root")
+    if payload.existing and not target.is_dir():
+        raise HTTPException(status_code=400, detail="Existing project directory not found")
+    if target.exists() and not payload.existing:
         raise HTTPException(
             status_code=409, detail=_("{path} already exists").format(path=str(target))
         )
     try:
-        target.mkdir(parents=True)
+        if not payload.existing:
+            target.mkdir(parents=True)
     except OSError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    git_error = _git_init(target) if payload.git_init else None
+    git_error = _git_init(target) if payload.git_init and not payload.existing else None
 
     with get_conn() as conn:
         conn.execute(
@@ -173,7 +179,7 @@ def api_create_project(payload: ProjectCreate) -> JSONResponse:
             "project": project,
             "path": str(target),
             "group": group,
-            "git": payload.git_init and git_error is None,
+            "git": (target / ".git").exists(),
             "git_error": git_error,
         },
         status_code=201,
