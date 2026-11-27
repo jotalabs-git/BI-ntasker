@@ -14,7 +14,7 @@ from typing import Literal, Sequence
 
 ExecutionBackend = Literal["local", "sandbox"]
 
-_SANDBOX_NAME = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]{0,62}$")
+_SANDBOX_NAME = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9-]{0,61}[a-zA-Z0-9]$")
 
 
 class ExecutionConfigError(ValueError):
@@ -61,10 +61,9 @@ def plan_launch(
         raise ExecutionConfigError("invalid sandbox name")
     if not sbx_binary or "/" in sbx_binary or not re.fullmatch(r"[a-zA-Z0-9_-]+", sbx_binary):
         raise ExecutionConfigError("invalid sbx binary name")
-    # This plan is explicit and has no shell interpolation. It is NOT yet
-    # connected to ntasker's PTY runner; sbx CLI semantics must be verified.
+    # Attach only to an existing, explicitly approved sandbox.
     return LaunchPlan(
-        (sbx_binary, "run", "--name", sandbox_name, *argv),
+        (sbx_binary, "--no-input", "exec", "-it", "--workdir", str(workdir), sandbox_name, *argv),
         workdir,
         "sandbox",
     )
