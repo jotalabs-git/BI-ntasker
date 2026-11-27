@@ -25,7 +25,8 @@ def test_sandbox_plan_uses_explicit_arguments(tmp_path):
     )
     assert plan.argv == (
         "sbx", "--no-input", "exec", "-it", "--workdir", str(project.resolve()),
-        "buenasideas-erp-pi", "pi", "--model", "ornith-1.5:9b"
+        "buenasideas-erp-pi", "bash", "-ic", 'exec "$@"', "ntasker-agent",
+        "pi", "--model", "ornith-1.5:9b"
     )
     assert plan.backend == "sandbox"
 
