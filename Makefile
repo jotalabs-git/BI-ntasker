@@ -80,11 +80,11 @@ i18n-compile:
 i18n: i18n-extract i18n-update i18n-compile
 
 .PHONY: mcp mcp-test mcp-integral
-# Optional SDK environment; does not change the application's lockfile.
-MCP_UV = uv run --locked --with 'mcp>=1.12,<2'
+# MCP SDK must be declared in pyproject.toml and locked in uv.lock.
+MCP_UV = uv run --locked
 mcp:
 	@$(MCP_UV) python -m ntasker.mcp_server
 mcp-test:
-	$(MCP_UV) pytest tests/test_mcp_server.py -v
+	$(MCP_UV) python -m pytest tests/test_mcp_server.py -v
 mcp-integral:
 	$(MCP_UV) python tests/mcp_stdio_smoke.py
