@@ -63,7 +63,8 @@ def plan_launch(
         raise ExecutionConfigError("invalid sbx binary name")
     # Attach only to an existing, explicitly approved sandbox.
     return LaunchPlan(
-        (sbx_binary, "--no-input", "exec", "-it", "--workdir", str(workdir), sandbox_name, *argv),
+        (sbx_binary, "--no-input", "exec", "-it", "--workdir", str(workdir), sandbox_name,
+         "bash", "-ic", 'exec "$@"', "ntasker-agent", *argv),
         workdir,
         "sandbox",
     )
