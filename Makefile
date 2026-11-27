@@ -9,7 +9,7 @@ PYBABEL := .venv/bin/pybabel
 VERSION := $(shell $(PYTHON) -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
 
 install:
-	uv sync
+	uv sync --locked
 
 init:
 	uv run ntasker init
@@ -18,7 +18,7 @@ init:
 # registry (the master fd can't be re-adopted), silently killing any live
 # session. Restart by hand (Ctrl-C + make run) when you change server code.
 run:
-	uv run ntasker serve
+	NTASKER_EXECUTION_BACKEND=sandbox NTASKER_TRIAGE_ENABLED=off uv run --locked ntasker serve
 
 smoke:
 	uv run python smoke_test.py
