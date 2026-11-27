@@ -9,7 +9,7 @@ PYBABEL := .venv/bin/pybabel
 VERSION := $(shell $(PYTHON) -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
 
 install:
-	uv sync
+	uv sync --locked
 
 init:
 	uv run ntasker init
