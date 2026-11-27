@@ -74,12 +74,25 @@ def pty_available() -> tuple[bool, str | None]:
     return True, None
 
 
+def execution_policy_error() -> str | None:
+    """Fail closed until the sandbox PTY transport is verified."""
+    backend = os.environ.get("NTASKER_EXECUTION_BACKEND", "sandbox")
+    if backend == "local":
+        return None
+    if backend == "sandbox":
+        return "Sandbox execution is not yet available; local agent execution is blocked."
+    return f"Unsupported execution backend: {backend}"
+
+
 def terminal_available(spec: AgentSpec) -> tuple[bool, str | None]:
     """Return ``(available, reason_if_not)`` for one agent.
 
     Needs a POSIX PTY *and* the agent's CLI on PATH. Either missing -> the UI
     hides that agent's run button and surfaces the reason.
     """
+    policy_error = execution_policy_error()
+    if policy_error:
+        return False, policy_error
     ok, reason = pty_available()
     if not ok:
         return ok, reason
@@ -892,6 +905,10 @@ def _start_session(
     # all. Refuse here so no caller can slip past.
     if row is not None and (row["draft"] or row["proposed"]):
         raise DraftTaskError(f"task #{task_id} is a draft or inbox proposal")
+
+    policy_error = execution_policy_error()
+    if policy_error:
+        raise RuntimeError(policy_error)
 
     spec = get_spec(resolve_agent_key(row["agent"] if row else None))
     cwd = default_cwd_for_project(row["project"] if row else None)
