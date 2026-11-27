@@ -1,7 +1,5 @@
 """Execution adapter preflight; no Docker daemon or agent is required."""
 
-from pathlib import Path
-
 import pytest
 
 from ntasker.execution import ExecutionConfigError, plan_launch
@@ -26,7 +24,8 @@ def test_sandbox_plan_uses_explicit_arguments(tmp_path):
         sandbox_name="buenasideas-erp-pi",
     )
     assert plan.argv == (
-        "sbx", "run", "--name", "buenasideas-erp-pi", "pi", "--model", "ornith-1.5:9b"
+        "sbx", "--no-input", "exec", "-it", "--workdir", str(project.resolve()),
+        "buenasideas-erp-pi", "pi", "--model", "ornith-1.5:9b"
     )
     assert plan.backend == "sandbox"
 
